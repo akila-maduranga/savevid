@@ -113,6 +113,31 @@ async def download_to_file(download_id: str, url: str, format_id: str = None, mo
         WEB_DOWNLOAD_PROGRESS[download_id]["filename"] = filename
         WEB_DOWNLOAD_PROGRESS[download_id]["_last_update"] = time.time()
         
+        # Track traffic statistics
+        try:
+            from app_web import TRAFFIC_STATS
+            file_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            TRAFFIC_STATS['total_downloads'] += 1
+            TRAFFIC_STATS['data_transferred_bytes'] += file_size
+            
+            today = time.strftime('%Y-%m-%d')
+            if today not in TRAFFIC_STATS['daily_stats']:
+                TRAFFIC_STATS['daily_stats'][today] = 0
+            TRAFFIC_STATS['daily_stats'][today] += 1
+            
+            TRAFFIC_STATS['recent_downloads'].append({
+                'url': url,
+                'size': humanbytes(file_size),
+                'time': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'status': 'complete'
+            })
+            
+            # Keep only last 50 downloads
+            if len(TRAFFIC_STATS['recent_downloads']) > 50:
+                TRAFFIC_STATS['recent_downloads'] = TRAFFIC_STATS['recent_downloads'][-50:]
+        except Exception:
+            pass
+        
     except Exception as e:
         Config.LOGGER.error(f"Download failed for {download_id}: {e}")
         WEB_DOWNLOAD_PROGRESS[download_id]["status"] = "error"

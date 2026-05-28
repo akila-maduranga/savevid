@@ -1,94 +1,285 @@
-# Telegram URL Uploader Bot
+# KeepThisClip
 
-A powerful Telegram bot that uploads files up to **2 GB** directly to Telegram from any URL — including Instagram, TikTok, Twitter/X, and 700+ more platforms. Built with Pyrogram (MTProto) for large file support.
-
-**This version includes integrated link-api for direct media extraction without external dependencies.**
-
----
+A powerful web-based downloader that downloads files from URLs (up to 2GB) including Instagram, TikTok, Twitter/X, YouTube, and 700+ more platforms. Built with Flask, yt-dlp, and Playwright for media extraction.
 
 ## Features
 
-| Feature | Details |
-|---------|---------|
-| 📱 Telegram Mini App | Modern web interface for link scanning, quality selection, and progress tracking |
-| 🌐 Built-in Link Extractor | Playwright-based media extraction (no external API needed) |
-| 📤 Direct URL Upload | Send any direct download URL — bot downloads & uploads |
-| 📺 yt-dlp Integration | Download from Instagram, TikTok, Twitter/X, Reddit, Facebook, Vimeo + 700 more |
-| ✏️ File Renaming | Bot asks for a new filename before every upload |
-| 🎬 Media / Document mode | Choose to send as streamable video or raw document |
-| 🎵 Audio Extraction | Extract high-quality audio tracks directly from video links |
-| 🎞️ Auto Thumbnail | ffmpeg auto-generates thumbnail from video frame |
-| ⏱️ Video Metadata | ffprobe extracts duration, width, height for proper Telegram video display |
-| 🌊 HLS / DASH streams | `.m3u8`, `.mpd`, `.ts` streamed via ffmpeg → saved as `.mp4` |
-| 💾 Up to 2 GB | Pyrogram MTProto — not the 50 MB Bot API limit |
-| 📝 Custom Captions | Per-user saved captions |
-| 🖼️ Permanent Thumbnails | Stored as Telegram `file_id` — survive restarts & redeployments |
-| 📊 Live Progress | Real-time progress bars in both Bot chat and Web Mini App |
-| 🚀 Upload Boost | pyroblack `upload_boost=True` + 5 parallel MTProto connections |
-
----
+- 🌐 **Modern Web Interface** - Clean, responsive UI with glassmorphism design
+- � **Multi-Platform Support** - YouTube, Instagram, TikTok, Twitter/X, Reddit, Facebook, Vimeo + 700+ more
+- 🎬 **Quality Selection** - Choose video quality before downloading
+- 🎵 **Audio Extraction** - Extract audio from videos (MP3)
+- ✏️ **Custom Filename** - Rename files before download
+- 🔒 **SSL/HTTPS** - Automatic SSL with Caddy and Let's Encrypt
+- 🚀 **One-Command Deployment** - Deploy to VPS with a single command
+- 📊 **Live Progress** - Real-time download progress tracking
+- � **Docker** - Fully containerized deployment
+- 👨‍� **Admin Panel** - Built-in admin dashboard for monitoring and configuration
+- � **Traffic Analytics** - Track downloads, users, and data transferred
+- ⚙️ **Site Configuration** - Customize settings via admin panel
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Telegram Bot (Pyrogram)                │
-│                   MTProto API (2GB limit)                  │
+│                     Caddy (SSL/Proxy)                      │
+│                   Port 80/443 (HTTPS)                      │
 └──────────────────────────┬──────────────────────────────────┘
                            │
         ┌──────────────────┼──────────────────┐
         │                  │                  │
         ▼                  ▼                  ▼
 ┌───────────────┐  ┌──────────────┐  ┌────────────────┐
-│ Flask Server   │  │  yt-dlp      │  │  Playwright    │
-│ (Health/UI)    │  │  Extractor   │  │  Link Extractor│
-│ Port 8080      │  │              │  │  (Built-in)    │
+│ Flask App     │  │  YouTube API │  │  MongoDB       │
+│ (Web UI)      │  │  (yt-dlp)    │  │  (Database)    │
+│ Port 8080     │  │  Port 8001   │  │  Port 27017    │
 └───────────────┘  └──────────────┘  └────────────────┘
 ```
 
----
+## Quick Start (VPS Deployment)
 
-## Quick Start (Docker)
+### Prerequisites
 
-### 1. Clone and Deploy
+- A VPS with Ubuntu/Debian (recommended: 2GB RAM, 20GB disk)
+- A domain name (e.g., keepthisclip.com) pointed to your VPS
+- DNS provider (Namecheap, GoDaddy, etc.) - Caddy uses HTTP challenge
 
+### One-Command Deployment
+
+1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/telelinkworking.git
-cd telelinkworking
+git clone https://github.com/yourusername/keepthisclip.git
+cd keepthisclip
 ```
 
-### 2. Configure Environment Variables
+2. **Configure environment:**
+```bash
+cp .env.example .env
+nano .env
+```
 
-Create a `.env` file:
-
+Edit the following variables:
 ```env
-# Required
-BOT_TOKEN=your_bot_token_from_botfather
-API_ID=your_api_id_from_my_telegram_org
-API_HASH=your_api_hash_from_my_telegram_org
-OWNER_ID=your_telegram_user_id
-DATABASE_URL=mongodb_connection_string
-LOG_CHANNEL=-1001234567890
-
-# Optional - Leave empty for local extraction
-LINK_API_URL=
-COBALT_API_URL=
-YOUTUBE_API_URL=https://historic-geri-akilanew-c671a2ac.koyeb.app
-
-# Optional - Web App
-WEBAPP_URL=
-ADSGRAM_BLOCK_ID=int-23574
+DOMAIN=keepthisclip.com
 ```
 
-### 3. Deploy to Koyeb (Docker)
+3. **Point your domain to your VPS:**
+- Go to your DNS provider (Namecheap, GoDaddy, etc.)
+- Add an A record pointing to your VPS IP address
+- Wait for DNS to propagate (usually 5-30 minutes)
 
-1. Push to GitHub
-2. Create service on Koyeb → Select **Docker**
-3. Add environment variables
-4. Set Port to **8080**
-5. Deploy!
+4. **Deploy:**
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
 
----
+That's it! Your KeepThisClip will be available at `https://keepthisclip.com`
+
+## Manual Deployment
+
+If you prefer manual deployment:
+
+1. **Install Docker and Docker Compose:**
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+2. **Configure environment:**
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
+
+3. **Create directories:**
+```bash
+mkdir -p DOWNLOADS youtube_api/downloads
+```
+
+4. **Build and start:**
+```bash
+docker-compose build
+docker-compose up -d
+```
+
+## Configuration
+
+### Environment Variables (.env)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DOMAIN` | Yes | Your domain name (e.g., keepthisclip.com) |
+| `DATABASE_URL` | No | MongoDB connection string (default: mongodb://mongodb:27017/keepthisclip) |
+| `FFMPEG_PATH` | No | Path to FFmpeg (default: /usr/bin/ffmpeg) |
+| `YOUTUBE_API_URL` | No | YouTube API URL (default: http://youtube-api:8001) |
+| `PORT` | No | Flask app port (default: 8080) |
+| `ADMIN_USERNAME` | No | Admin username (default: admin) |
+| `ADMIN_PASSWORD` | No | Admin password (default: admin123) |
+| `SECRET_KEY` | No | JWT secret key (CHANGE IN PRODUCTION) |
+
+**Note:** Caddy uses HTTP challenge for SSL, which works with any DNS provider (Namecheap, GoDaddy, etc.). No API token needed.
+
+## Usage
+
+1. Open your browser and go to `https://keepthisclip.com`
+2. Paste a URL (YouTube, Instagram, TikTok, etc.)
+3. Click "Check URL" to see available qualities
+4. Select quality and download mode
+5. Optionally enter a custom filename
+6. Click "Start Download"
+7. Wait for download to complete
+8. Click "Download File" to save to your device
+
+## Admin Panel
+
+Access the admin panel at `https://keepthisclip.com/admin`
+
+**Default Credentials:**
+- Username: `admin`
+- Password: `admin123`
+
+⚠️ **Important:** Change the default admin credentials in `.env` before deploying to production.
+
+### Admin Panel Features
+
+**Dashboard:**
+- Total users count
+- Total downloads
+- Data transferred (GB)
+- Active downloads
+
+**Users:**
+- List of all users/download sessions
+- Download count per user
+- Last active time
+- Active/inactive status
+
+**Traffic:**
+- Today's downloads
+- Weekly downloads
+- Monthly downloads
+- Average download size
+- Recent downloads list
+
+**Settings:**
+- Site name configuration
+- Max file size limit
+- Download timeout
+- Change admin password
+
+## API Endpoints
+
+The web app also provides API endpoints for integration:
+
+### Get Video Formats
+```bash
+POST /api/formats
+Content-Type: application/json
+
+{
+  "url": "https://youtube.com/watch?v=xxxx"
+}
+```
+
+### Start Download
+```bash
+POST /api/web-download
+Content-Type: application/json
+
+{
+  "url": "https://youtube.com/watch?v=xxxx",
+  "format_id": "best",
+  "mode": "direct",
+  "filename": "video.mp4"
+}
+```
+
+Returns:
+```json
+{
+  "download_id": "uuid-string"
+}
+```
+
+### Check Progress
+```bash
+GET /api/progress/{download_id}
+```
+
+Returns:
+```json
+{
+  "status": "downloading",
+  "percentage": 45.5,
+  "action": "Downloading...",
+  "speed": "5.2 MB/s"
+}
+```
+
+### Download File
+```bash
+GET /api/download-file/{download_id}
+```
+
+### Link Extraction API
+```bash
+GET /grab?url={url}
+POST /grab
+Content-Type: application/json
+{"url": "https://example.com/video"}
+```
+
+## Management Commands
+
+### View logs:
+```bash
+docker-compose logs -f
+```
+
+### Stop services:
+```bash
+docker-compose down
+```
+
+### Restart services:
+```bash
+docker-compose restart
+```
+
+### Update and rebuild:
+```bash
+git pull
+docker-compose build
+docker-compose up -d
+```
+
+### Clean up old downloads:
+```bash
+docker-compose exec app rm -rf /app/DOWNLOADS/*
+```
+
+## Troubleshooting
+
+### SSL not working?
+- Check that your domain DNS points to your VPS
+- Verify DNS has propagated (5-30 minutes)
+- Check Caddy logs: `docker-compose logs caddy`
+
+### Downloads failing?
+- Check app logs: `docker-compose logs app`
+- Verify YouTube API is running: `docker-compose logs youtube-api`
+- Check disk space: `df -h`
+
+### Port 80/443 already in use?
+- Stop other web servers (nginx, apache)
+- Or modify Caddyfile to use different ports
+
+### Admin panel not accessible?
+- Verify admin credentials in .env
+- Check app logs for authentication errors
+- Ensure SECRET_KEY is set
 
 ## Local Development
 
@@ -96,175 +287,89 @@ ADSGRAM_BLOCK_ID=int-23574
 
 - Python 3.11+
 - FFmpeg
-- MongoDB (local or Atlas)
-- Chromium (auto-installed via Playwright)
+- MongoDB (optional - can skip for testing)
 
 ### Installation
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/telelinkworking.git
-cd telelinkworking
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate     # Windows
-
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
+
+# Install FFmpeg
+# Windows: Download from https://ffmpeg.org/download.html
+# Mac: brew install ffmpeg
+# Linux: sudo apt install ffmpeg
 
 # Install Playwright browsers
 playwright install chromium
 
-# Run the bot
-python bot.py
+# Set environment variables
+export DOMAIN=localhost
+export PORT=8080
+
+# Run the web app
+python app_web.py
 ```
 
----
+Then open `http://localhost:8080` in your browser.
 
-## Bot Commands
+## Security
 
-```
-/start           – Check if bot is alive 🔔
-/help            – Show all commands ❓
-/about           – Bot info ℹ️
-/upload <url>    – Upload file from URL 📤
-/skip            – Keep original filename during rename
+- All downloads are isolated in Docker containers
+- Automatic SSL with Let's Encrypt
+- URL validation to prevent SSRF attacks
+- Old downloads are automatically cleaned up (1 hour)
+- Admin panel protected with JWT tokens (24-hour expiration)
+- Change default credentials before production
 
-/caption <text>  – Set custom upload caption 📝
-/showcaption     – View your caption
-/clearcaption    – Clear caption
+## Supported Platforms
 
-/setthumb        – Reply to a photo to set permanent thumbnail 🖼️
-/showthumb       – Preview your thumbnail
-/delthumb        – Delete thumbnail
-
---- Admin only ---
-/broadcast <msg> – Broadcast to all users 📢
-/total           – Total registered users 👥
-/ban <id>        – Ban a user ⛔
-/unban <id>      – Unban a user ✅
-/status          – CPU / RAM / Disk stats + FFmpeg detection 🚀
-```
-
----
-
-## Built-in Link API
-
-This bot includes an integrated link extraction API powered by Playwright. No external service required!
-
-### Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/grab?url=<URL>` | Get best direct download link |
-| POST | `/grab` | Same with JSON body |
-| POST | `/extract` | Get full yt-dlp compatible JSON |
-
-### Example Usage
-
-```bash
-# Get best link
-curl "http://localhost:8080/grab?url=https://example.com/video"
-
-# Get full extraction
-curl -X POST "http://localhost:8080/extract" \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/video"}'
-```
-
----
-
-## Environment Variables
-
-### Required
-
-| Variable | Description |
-|----------|-------------|
-| `BOT_TOKEN` | From @BotFather |
-| `API_ID` | From my.telegram.org |
-| `API_HASH` | From my.telegram.org |
-| `OWNER_ID` | Your Telegram user ID |
-| `DATABASE_URL` | MongoDB connection string |
-| `LOG_CHANNEL` | Private channel ID for upload logs |
-
-### Optional
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ALLOW_BOT_URL_UPLOAD` | True | Set to False to force users to use Mini App |
-| `BOT_USERNAME` | UrlUploaderBot | Bot username |
-| `ADMIN` | - | Space-separated admin user IDs |
-| `BANNED_USERS` | - | Space-separated banned user IDs |
-| `LINK_API_URL` | (empty) | External link API (uses built-in if empty) |
-| `COBALT_API_URL` | (empty) | Cobalt API for Instagram/TikTok fallback |
-| `YOUTUBE_API_URL` | (empty) | YouTube API for YouTube downloads |
-| `WEBAPP_URL` | (empty) | Your Koyeb app URL |
-| `ADSGRAM_BLOCK_ID` | int-23574 | Adsgram ad block ID |
-| `SESSION_STRING` | - | Premium session for 4GB uploads |
-| `CHUNK_SIZE` | 10240 | Upload chunk size in KB |
-| `COOKIES_FILE` | cookies.txt | Path to cookies file |
-| `PROXY` | - | Proxy URL |
-| `FFMPEG_PATH` | ffmpeg | Path to FFmpeg |
-
----
+yt-dlp supports 1700+ sites including:
+- YouTube
+- Instagram
+- TikTok
+- Twitter/X
+- Facebook
+- Reddit
+- Vimeo
+- Dailymotion
+- Twitch
+- SoundCloud
+- Bilibili
+- And many more...
 
 ## Project Structure
 
 ```
-telelinkworking/
-├── bot.py                  # Main entry point
-├── app.py                  # Flask server + Link API endpoints
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Docker configuration
+keepthisclip/
+├── app_web.py              # Flask web server
+├── docker-compose.yml      # Docker orchestration
+├── Dockerfile.web          # Web Dockerfile
+├── Caddyfile              # Caddy SSL configuration
+├── deploy.sh              # One-command deployment script
+├── .env.example           # Environment variables template
+├── requirements.txt       # Python dependencies
 ├── plugins/
-│   ├── config.py           # Environment configuration
-│   ├── commands.py         # Bot command handlers
-│   ├── admin.py           # Admin commands
+│   ├── config.py          # Configuration
 │   └── helper/
-│       ├── upload.py       # Download & upload logic
-│       ├── extractor.py    # Link extraction orchestration
-│       ├── browser_extractor.py  # Playwright-based extraction
-│       └── database.py     # MongoDB operations
-├── web/
-│   ├── index.html         # Mini App frontend
-│   └── app.js             # Frontend JavaScript
-└── utils/
-    └── shared.py          # Shared state
+│       ├── upload.py      # Download logic
+│       ├── extractor.py   # Link extraction
+│       └── database.py    # MongoDB operations
+├── web_new/
+│   ├── index.html         # Main web UI
+│   ├── app.js            # Frontend JavaScript
+│   └── admin.html        # Admin panel
+└── youtube_api/           # YouTube downloader service
 ```
 
----
+## License
 
-## Troubleshooting
-
-### Bot won't start?
-
-- Check that `BOT_TOKEN`, `API_ID`, and `API_HASH` are set
-- Verify MongoDB connection string is valid
-
-### Playwright errors?
-
-- Run `playwright install chromium` manually
-- Check that required system libraries are installed
-
-### Instagram/TikTok failing?
-
-- The bot will automatically fall back to Cobalt API if configured
-- Set `COBALT_API_URL` for Instagram/Pinterest fallback
-- Or use cookies for authenticated downloads
-
-### Memory issues?
-
-- The bot cleans the DOWNLOADS folder on startup
-- Progress entries older than 1 hour are automatically pruned
-
----
+This project is based on the Telegram URL Uploader Bot, transformed into a web application.
 
 ## Credits
 
-- [Pyrogram](https://pyrogram.org/) - Telegram MTProto client
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Video downloader
 - [Playwright](https://playwright.dev/) - Browser automation
-- [Koyeb](https://koyeb.com/) - Deployment platform
+- [Flask](https://flask.palletsprojects.com/) - Web framework
+- [Caddy](https://caddyserver.com/) - Web server with automatic SSL
+- [Docker](https://www.docker.com/) - Containerization

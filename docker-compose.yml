@@ -13,6 +13,9 @@ services:
       - FFMPEG_PATH=/usr/bin/ffmpeg
       - YOUTUBE_API_URL=http://youtube-api:8001
       - DATABASE_URL=mongodb://mongodb:27017/cloud_downloader
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - SECRET_KEY=${SECRET_KEY:-keepthisclip-secret-key-change-in-production}
     volumes:
       - ./DOWNLOADS:/app/DOWNLOADS
     depends_on:

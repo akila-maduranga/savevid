@@ -3,12 +3,18 @@ import asyncio
 import urllib.parse
 import uuid
 import threading
+import hashlib
+import jwt
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from plugins.config import Config
 import time
 
 # Serve the new web frontend
 app = Flask(__name__, static_folder="web_new")
+
+# Secret key for JWT
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'keepthisclip-secret-key-change-in-production')
 
 # Runtime flags
 app.is_ready = False
@@ -19,6 +25,25 @@ _INDEX_HTML_CACHE = None
 
 # Import download progress tracking from upload.py
 from plugins.helper.upload import WEB_DOWNLOAD_PROGRESS as DOWNLOAD_PROGRESS
+
+# Admin credentials (default: admin/admin123)
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+# Traffic tracking
+TRAFFIC_STATS = {
+    'total_downloads': 0,
+    'data_transferred_bytes': 0,
+    'recent_downloads': [],
+    'daily_stats': {}
+}
+
+# Site configuration
+SITE_CONFIG = {
+    'site_name': 'KeepThisClip',
+    'max_file_size_gb': 2,
+    'download_timeout': 300
+}
 
 async def prune_progress_task():
     """Background task to keep memory low by pruning old progress data."""
@@ -184,6 +209,125 @@ def health():
     if not app.is_ready:
         return {"status": "starting"}, 503
     return {"status": "ok"}, 200
+
+# ── Admin Panel Routes ─────────────────────────────────────────────────────
+
+@app.route("/admin")
+def admin_panel():
+    """Serve the admin panel HTML."""
+    return send_from_directory("web_new", "admin.html")
+
+def generate_token(username):
+    """Generate JWT token for admin authentication."""
+    payload = {
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(hours=24)
+    }
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+def verify_token(token):
+    """Verify JWT token."""
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+    """Admin login endpoint."""
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        token = generate_token(username)
+        return jsonify({"token": token}), 200
+    else:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+@app.route("/admin/stats", methods=["GET"])
+def admin_stats():
+    """Get overall statistics."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not verify_token(token):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    return jsonify({
+        "total_users": len(DOWNLOAD_PROGRESS),
+        "total_downloads": TRAFFIC_STATS['total_downloads'],
+        "data_transferred_gb": TRAFFIC_STATS['data_transferred_bytes'] / (1024**3),
+        "active_downloads": len([d for d in DOWNLOAD_PROGRESS.values() if d.get('status') == 'downloading'])
+    }), 200
+
+@app.route("/admin/users", methods=["GET"])
+def admin_users():
+    """Get user information."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not verify_token(token):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    users = []
+    for download_id, info in DOWNLOAD_PROGRESS.items():
+        users.append({
+            "user_id": download_id[:8],
+            "downloads": 1 if info.get('status') == 'complete' else 0,
+            "last_active": datetime.fromtimestamp(info.get('_last_update', time.time())).strftime('%Y-%m-%d %H:%M'),
+            "active": info.get('status') == 'downloading'
+        })
+
+    return jsonify({"users": users}), 200
+
+@app.route("/admin/traffic", methods=["GET"])
+def admin_traffic():
+    """Get traffic statistics."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not verify_token(token):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    return jsonify({
+        "today": TRAFFIC_STATS['daily_stats'].get(today, 0),
+        "week": sum(TRAFFIC_STATS['daily_stats'].values()),
+        "month": sum(TRAFFIC_STATS['daily_stats'].values()),
+        "avg_size_mb": (TRAFFIC_STATS['data_transferred_bytes'] / TRAFFIC_STATS['total_downloads'] / (1024**2)) if TRAFFIC_STATS['total_downloads'] > 0 else 0,
+        "recent": TRAFFIC_STATS['recent_downloads'][-10:]
+    }), 200
+
+@app.route("/admin/settings", methods=["GET", "POST"])
+def admin_settings():
+    """Get or update site settings."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not verify_token(token):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    if request.method == 'GET':
+        return jsonify(SITE_CONFIG), 200
+    
+    if request.method == 'POST':
+        data = request.json
+        SITE_CONFIG.update(data)
+        return jsonify({"success": True}), 200
+
+@app.route("/admin/change-password", methods=["POST"])
+def admin_change_password():
+    """Change admin password."""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not verify_token(token):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.json
+    new_password = data.get("password")
+    
+    if new_password:
+        global ADMIN_PASSWORD
+        ADMIN_PASSWORD = new_password
+        return jsonify({"success": True}), 200
+    
+    return jsonify({"error": "Invalid password"}), 400
 
 # ── Link API Endpoints (for external integration) ─────────────────────────────
 
