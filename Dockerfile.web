@@ -10,6 +10,7 @@ RUN apt-get update && \
     curl \
     ca-certificates \
     gnupg \
+    zip \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
