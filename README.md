@@ -1,0 +1,270 @@
+# Telegram URL Uploader Bot
+
+A powerful Telegram bot that uploads files up to **2 GB** directly to Telegram from any URL — including Instagram, TikTok, Twitter/X, and 700+ more platforms. Built with Pyrogram (MTProto) for large file support.
+
+**This version includes integrated link-api for direct media extraction without external dependencies.**
+
+---
+
+## Features
+
+| Feature | Details |
+|---------|---------|
+| 📱 Telegram Mini App | Modern web interface for link scanning, quality selection, and progress tracking |
+| 🌐 Built-in Link Extractor | Playwright-based media extraction (no external API needed) |
+| 📤 Direct URL Upload | Send any direct download URL — bot downloads & uploads |
+| 📺 yt-dlp Integration | Download from Instagram, TikTok, Twitter/X, Reddit, Facebook, Vimeo + 700 more |
+| ✏️ File Renaming | Bot asks for a new filename before every upload |
+| 🎬 Media / Document mode | Choose to send as streamable video or raw document |
+| 🎵 Audio Extraction | Extract high-quality audio tracks directly from video links |
+| 🎞️ Auto Thumbnail | ffmpeg auto-generates thumbnail from video frame |
+| ⏱️ Video Metadata | ffprobe extracts duration, width, height for proper Telegram video display |
+| 🌊 HLS / DASH streams | `.m3u8`, `.mpd`, `.ts` streamed via ffmpeg → saved as `.mp4` |
+| 💾 Up to 2 GB | Pyrogram MTProto — not the 50 MB Bot API limit |
+| 📝 Custom Captions | Per-user saved captions |
+| 🖼️ Permanent Thumbnails | Stored as Telegram `file_id` — survive restarts & redeployments |
+| 📊 Live Progress | Real-time progress bars in both Bot chat and Web Mini App |
+| 🚀 Upload Boost | pyroblack `upload_boost=True` + 5 parallel MTProto connections |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Telegram Bot (Pyrogram)                │
+│                   MTProto API (2GB limit)                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        │                  │                  │
+        ▼                  ▼                  ▼
+┌───────────────┐  ┌──────────────┐  ┌────────────────┐
+│ Flask Server   │  │  yt-dlp      │  │  Playwright    │
+│ (Health/UI)    │  │  Extractor   │  │  Link Extractor│
+│ Port 8080      │  │              │  │  (Built-in)    │
+└───────────────┘  └──────────────┘  └────────────────┘
+```
+
+---
+
+## Quick Start (Docker)
+
+### 1. Clone and Deploy
+
+```bash
+git clone https://github.com/yourusername/telelinkworking.git
+cd telelinkworking
+```
+
+### 2. Configure Environment Variables
+
+Create a `.env` file:
+
+```env
+# Required
+BOT_TOKEN=your_bot_token_from_botfather
+API_ID=your_api_id_from_my_telegram_org
+API_HASH=your_api_hash_from_my_telegram_org
+OWNER_ID=your_telegram_user_id
+DATABASE_URL=mongodb_connection_string
+LOG_CHANNEL=-1001234567890
+
+# Optional - Leave empty for local extraction
+LINK_API_URL=
+COBALT_API_URL=
+YOUTUBE_API_URL=https://historic-geri-akilanew-c671a2ac.koyeb.app
+
+# Optional - Web App
+WEBAPP_URL=
+ADSGRAM_BLOCK_ID=int-23574
+```
+
+### 3. Deploy to Koyeb (Docker)
+
+1. Push to GitHub
+2. Create service on Koyeb → Select **Docker**
+3. Add environment variables
+4. Set Port to **8080**
+5. Deploy!
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Python 3.11+
+- FFmpeg
+- MongoDB (local or Atlas)
+- Chromium (auto-installed via Playwright)
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/telelinkworking.git
+cd telelinkworking
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate     # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install Playwright browsers
+playwright install chromium
+
+# Run the bot
+python bot.py
+```
+
+---
+
+## Bot Commands
+
+```
+/start           – Check if bot is alive 🔔
+/help            – Show all commands ❓
+/about           – Bot info ℹ️
+/upload <url>    – Upload file from URL 📤
+/skip            – Keep original filename during rename
+
+/caption <text>  – Set custom upload caption 📝
+/showcaption     – View your caption
+/clearcaption    – Clear caption
+
+/setthumb        – Reply to a photo to set permanent thumbnail 🖼️
+/showthumb       – Preview your thumbnail
+/delthumb        – Delete thumbnail
+
+--- Admin only ---
+/broadcast <msg> – Broadcast to all users 📢
+/total           – Total registered users 👥
+/ban <id>        – Ban a user ⛔
+/unban <id>      – Unban a user ✅
+/status          – CPU / RAM / Disk stats + FFmpeg detection 🚀
+```
+
+---
+
+## Built-in Link API
+
+This bot includes an integrated link extraction API powered by Playwright. No external service required!
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/grab?url=<URL>` | Get best direct download link |
+| POST | `/grab` | Same with JSON body |
+| POST | `/extract` | Get full yt-dlp compatible JSON |
+
+### Example Usage
+
+```bash
+# Get best link
+curl "http://localhost:8080/grab?url=https://example.com/video"
+
+# Get full extraction
+curl -X POST "http://localhost:8080/extract" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/video"}'
+```
+
+---
+
+## Environment Variables
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `BOT_TOKEN` | From @BotFather |
+| `API_ID` | From my.telegram.org |
+| `API_HASH` | From my.telegram.org |
+| `OWNER_ID` | Your Telegram user ID |
+| `DATABASE_URL` | MongoDB connection string |
+| `LOG_CHANNEL` | Private channel ID for upload logs |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ALLOW_BOT_URL_UPLOAD` | True | Set to False to force users to use Mini App |
+| `BOT_USERNAME` | UrlUploaderBot | Bot username |
+| `ADMIN` | - | Space-separated admin user IDs |
+| `BANNED_USERS` | - | Space-separated banned user IDs |
+| `LINK_API_URL` | (empty) | External link API (uses built-in if empty) |
+| `COBALT_API_URL` | (empty) | Cobalt API for Instagram/TikTok fallback |
+| `YOUTUBE_API_URL` | (empty) | YouTube API for YouTube downloads |
+| `WEBAPP_URL` | (empty) | Your Koyeb app URL |
+| `ADSGRAM_BLOCK_ID` | int-23574 | Adsgram ad block ID |
+| `SESSION_STRING` | - | Premium session for 4GB uploads |
+| `CHUNK_SIZE` | 10240 | Upload chunk size in KB |
+| `COOKIES_FILE` | cookies.txt | Path to cookies file |
+| `PROXY` | - | Proxy URL |
+| `FFMPEG_PATH` | ffmpeg | Path to FFmpeg |
+
+---
+
+## Project Structure
+
+```
+telelinkworking/
+├── bot.py                  # Main entry point
+├── app.py                  # Flask server + Link API endpoints
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Docker configuration
+├── plugins/
+│   ├── config.py           # Environment configuration
+│   ├── commands.py         # Bot command handlers
+│   ├── admin.py           # Admin commands
+│   └── helper/
+│       ├── upload.py       # Download & upload logic
+│       ├── extractor.py    # Link extraction orchestration
+│       ├── browser_extractor.py  # Playwright-based extraction
+│       └── database.py     # MongoDB operations
+├── web/
+│   ├── index.html         # Mini App frontend
+│   └── app.js             # Frontend JavaScript
+└── utils/
+    └── shared.py          # Shared state
+```
+
+---
+
+## Troubleshooting
+
+### Bot won't start?
+
+- Check that `BOT_TOKEN`, `API_ID`, and `API_HASH` are set
+- Verify MongoDB connection string is valid
+
+### Playwright errors?
+
+- Run `playwright install chromium` manually
+- Check that required system libraries are installed
+
+### Instagram/TikTok failing?
+
+- The bot will automatically fall back to Cobalt API if configured
+- Set `COBALT_API_URL` for Instagram/Pinterest fallback
+- Or use cookies for authenticated downloads
+
+### Memory issues?
+
+- The bot cleans the DOWNLOADS folder on startup
+- Progress entries older than 1 hour are automatically pruned
+
+---
+
+## Credits
+
+- [Pyrogram](https://pyrogram.org/) - Telegram MTProto client
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Video downloader
+- [Playwright](https://playwright.dev/) - Browser automation
+- [Koyeb](https://koyeb.com/) - Deployment platform
